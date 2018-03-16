@@ -5,6 +5,12 @@
  * All files of the Sming Core are provided under the LGPL v3 license.
  ****/
 
+/** @defgroup   tcpclient Clients
+ *  @brief      Provides base TCP client
+ *  @ingroup    tcp
+ *  @{
+ */
+
 #ifndef _SMING_CORE_TCPCLIENT_H_
 #define _SMING_CORE_TCPCLIENT_H_
 
@@ -12,7 +18,7 @@
 #include "../Delegate.h"
 
 class TcpClient;
-class MemoryDataStream;
+class ReadWriteStream;
 class IPAddress;
 
 //typedef void (*TcpClientEventDelegate)(TcpClient& client, TcpConnectionEvent sourceEvent);
@@ -43,14 +49,22 @@ public:
 	virtual ~TcpClient();
 
 public:
-	virtual bool connect(String server, int port);
-	virtual bool connect(IPAddress addr, uint16_t port);
+	virtual bool connect(String server, int port, boolean useSsl = false, uint32_t sslOptions = 0);
+	virtual bool connect(IPAddress addr, uint16_t port, boolean useSsl = false, uint32_t sslOptions = 0);
 	virtual void close();
 
+	/**	@brief	Set or clear the callback for received data
+	 *	@param	receiveCb callback delegate or NULL
+	 */
+	void setReceiveDelegate(TcpClientDataDelegate receiveCb = NULL);
+
+	/**	@brief	Set or clear the callback for connection close
+	 *	@param	completeCb callback delegate or NULL
+	 */
 	void setCompleteDelegate(TcpClientCompleteDelegate completeCb = NULL);
-	
+
 	bool send(const char* data, uint16_t len, bool forceCloseAfterSent = false);
-	bool sendString(String data, bool forceCloseAfterSent = false);
+	bool sendString(const String& data, bool forceCloseAfterSent = false);
 	__forceinline bool isProcessing()  { return state == eTCS_Connected || state == eTCS_Connecting; }
 	__forceinline TcpClientState getConnectionState() { return state; }
 
@@ -64,15 +78,19 @@ protected:
 
 	void pushAsyncPart();
 
+protected:
+	ReadWriteStream* stream = nullptr;
+
 private:
 	TcpClientState state;
 	TcpClientCompleteDelegate completed = nullptr;
 	TcpClientDataDelegate receive = nullptr;
 	TcpClientEventDelegate ready = nullptr;
-	MemoryDataStream* stream = nullptr;
+
 	bool asyncCloseAfterSent = false;
 	int16_t asyncTotalSent = 0;
 	int16_t asyncTotalLen = 0;
 };
 
+/** @} */
 #endif /* _SMING_CORE_TCPCLIENT_H_ */

@@ -34,6 +34,7 @@ void TelnetServer::enableDebug(bool reqStatus)
 
 void TelnetServer::enableCommand(bool reqStatus)
 {
+#if ENABLE_CMD_EXECUTOR
 	if (reqStatus && curClient && !commandExecutor)
 	{
 		commandExecutor = new  CommandExecutor(curClient);
@@ -43,17 +44,18 @@ void TelnetServer::enableCommand(bool reqStatus)
 		delete commandExecutor;
 		commandExecutor = nullptr;
 	}
+#endif
 	telnetCommand = reqStatus;
 }
 void TelnetServer::onClient(TcpClient *client)
 {
-	debugf("TelnetServer onClient %s", client->getRemoteIp().toString().c_str() );
+	debug_d("TelnetServer onClient %s", client->getRemoteIp().toString().c_str() );
 
 	TcpServer::onClient(client);
 
 	if (curClient)
 	{
-		debugf("TCP Client already connected");
+		debug_d("TCP Client already connected");
 		client->sendString("Telnet Client already connected\r\n");
 		client->close();
 	}
@@ -64,7 +66,9 @@ void TelnetServer::onClient(TcpClient *client)
 		curClient->sendString("Welcome to Sming / ESP6266 Telnet\r\n");
 		if (telnetCommand)
 		{
+#if ENABLE_CMD_EXECUTOR
 			commandExecutor = new  CommandExecutor(client);
+#endif
 		}
 		if (telnetDebug)
 		{
@@ -78,17 +82,19 @@ void TelnetServer::onClientComplete(TcpClient& client, bool succesfull)
 {
 	if ( &client == curClient)
 	{
+#if ENABLE_CMD_EXECUTOR
 		delete commandExecutor;
 		commandExecutor = nullptr;
+#endif
 		curClient = nullptr;
-		debugf("TelnetServer onClientComplete %s", client.getRemoteIp().toString().c_str() );
+		debug_d("TelnetServer onClientComplete %s", client.getRemoteIp().toString().c_str() );
 	}
 	else
 	{
-		debugf("Telnet server unconnected client close");
+		debug_d("Telnet server unconnected client close");
 	}
 
-	debugf("TelnetServer onClientComplete %s", client.getRemoteIp().toString().c_str() );
+	debug_d("TelnetServer onClientComplete %s", client.getRemoteIp().toString().c_str() );
 	TcpServer::onClientComplete(client, succesfull);
 	Debug.setDebug(Serial);
 }
@@ -102,12 +108,13 @@ void TelnetServer::wrchar(char c)
 
 bool TelnetServer::onClientReceive (TcpClient& client, char *data, int size)
 {
-	debugf("TelnetServer onClientReceive : %s, %d bytes \r\n",client.getRemoteIp().toString().c_str(),size );
-	debugf("Data : %s", data);
+	debug_d("TelnetServer onClientReceive : %s, %d bytes \r\n",client.getRemoteIp().toString().c_str(),size );
+	debug_d("Data : %s", data);
+#if ENABLE_CMD_EXECUTOR
 	if (commandExecutor)
 	{
 		commandExecutor->executorReceive(data,size);
 	}
-
+#endif
 	return true;
 }

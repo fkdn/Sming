@@ -5,6 +5,12 @@
  * All files of the Sming Core are provided under the LGPL v3 license.
  ****/
 
+/** @defgroup   udp UDP
+ *  @brief      Provides base for UDP clients or services
+ *  @ingroup    networking
+ *  @{
+ */
+
 #ifndef SMINGCORE_NETWORK_UDPCONNECTION_H_
 #define SMINGCORE_NETWORK_UDPCONNECTION_H_
 
@@ -31,22 +37,23 @@ public:
 	// After connect(..)
 	virtual void send(const char* data, int length);
 	void sendString(const char* data);
-	void sendString(const String data);
+	void sendString(const String& data);
 
 	virtual void sendTo(IPAddress remoteIP, uint16_t remotePort, const char* data, int length);
 	void sendStringTo(IPAddress remoteIP, uint16_t remotePort, const char* data);
-	void sendStringTo(IPAddress remoteIP, uint16_t remotePort, const String data);
+	void sendStringTo(IPAddress remoteIP, uint16_t remotePort, const String& data);
 
 protected:
 	virtual void onReceive(pbuf *buf, IPAddress remoteIP, uint16_t remotePort);
 
 protected:
 	void initialize(udp_pcb* pcb = NULL);
-	static void staticOnReceive(void *arg, struct udp_pcb *pcb, struct pbuf *p, struct ip_addr *addr, u16_t port);
+	static void staticOnReceive(void *arg, struct udp_pcb *pcb, struct pbuf *p, LWIP_IP_ADDR_T *addr, u16_t port);
 
 protected:
 	udp_pcb* udp;
 	UdpConnectionDataDelegate onDataCallback;
 };
 
+/** @} */
 #endif /* SMINGCORE_NETWORK_UDPCONNECTION_H_ */

@@ -14,7 +14,7 @@ URL::URL()
 	Port = 80;
 }
 
-URL::URL(String urlString)
+URL::URL(const String& urlString)
 {
 	int len = urlString.length();
 	if (len == 0)
@@ -59,7 +59,7 @@ URL::URL(String urlString)
 		hostEnd = portStart;
 
 	Host = urlString.substring(hostStart, hostEnd);
-	//debugf("%d %d %s", hostStart, hostEnd, Host.c_str());
+	//debug_d("%d %d %s", hostStart, hostEnd, Host.c_str());
 
 	// port
 	if (hasPort)  // we have a port
@@ -67,8 +67,12 @@ URL::URL(String urlString)
 		portStart++;
 		Port = urlString.substring(portStart, portEnd).toInt();
 	}
-	else
+	else if(Protocol == HTTPS_URL_PROTOCOL || Protocol == WEBSCOKET_SECURE_URL_PROTOCOL) {
+		Port = 443;
+	}
+	else {
 		Port = 80;
+	}
 
 	// path
 	if (pathStart != -1)

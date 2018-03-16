@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 	// UART config
-	#define SERIAL_BAUD_RATE 115200
+	#define SERIAL_BAUD_RATE COM_SPEED_SERIAL
 
 	// ESP SDK config
 	#define LWIP_OPEN_SRC
@@ -17,13 +17,17 @@ extern "C" {
 	#include <limits.h>
 	#include <stdint.h>
 
-	// Override c_types.h include and remove buggy espconn
-	#define _C_TYPES_H_
+	// Remove buggy espconn
 	#define _NO_ESPCON_
 
-	// Updated, compatible version of c_types.h
-	// Just removed types declared in <stdint.h>
+#ifdef SDK_INTERNAL
+	// ESP SDK  2.1 or later provide proper c_types.h
+	#include "c_types.h"
+#else
+	// Older SDKs, have wrong or incompatible c_types type definitions
+	#define _C_TYPES_H_
 	#include <espinc/c_types_compatible.h>
+#endif /* SDK_INTERNAL */
 
 	// System API declarations
 	#include <esp_systemapi.h>

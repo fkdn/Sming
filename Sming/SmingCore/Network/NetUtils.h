@@ -5,6 +5,10 @@
  * All files of the Sming Core are provided under the LGPL v3 license.
  ****/
 
+/** @defgroup   networking Networking
+ *  @{
+ */
+
 #ifndef _SMING_CORE_NETWORK_NETUTILS_H_
 #define _SMING_CORE_NETWORK_NETUTILS_H_
 
@@ -31,10 +35,11 @@ public:
 	static bool FixNetworkRouting();
 
 	// Debug
-	void debugPrintTcpList();
+	static void debugPrintTcpList();
 
 private:
 	static bool ipClientRoutingFixed;
 };
 
+/** @} */
 #endif /* _SMING_CORE_NETWORK_NETUTILS_H_ */

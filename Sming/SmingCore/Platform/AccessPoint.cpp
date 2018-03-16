@@ -18,7 +18,11 @@ AccessPointClass::AccessPointClass()
 
 void AccessPointClass::enable(bool enabled, bool save)
 {
-	uint8 mode = wifi_get_opmode() & ~SOFTAP_MODE;
+	uint8 mode;
+	if (save)
+		mode = wifi_get_opmode_default() & ~SOFTAP_MODE;
+	else
+		mode = wifi_get_opmode() & ~SOFTAP_MODE;
 	if (enabled) mode |= SOFTAP_MODE;
 	if (save)
 		wifi_set_opmode(mode);
@@ -31,7 +35,7 @@ bool AccessPointClass::isEnabled()
 	return wifi_get_opmode() & SOFTAP_MODE;
 }
 
-bool AccessPointClass::config(String ssid, String password, AUTH_MODE mode, bool hidden /* = false*/, int channel /* = 7*/, int beaconInterval /* = 200*/)
+bool AccessPointClass::config(const String& ssid, String password, AUTH_MODE mode, bool hidden /* = false*/, int channel /* = 7*/, int beaconInterval /* = 200*/)
 {
 	softap_config config = {0};
 	if (mode == AUTH_WEP) return false; // Not supported!
@@ -43,38 +47,45 @@ bool AccessPointClass::config(String ssid, String password, AUTH_MODE mode, bool
 	enable(true);
 	wifi_softap_dhcps_stop();
 	wifi_softap_get_config(&config);
-	config.channel = channel;
-	config.ssid_hidden = hidden;
-	memset(config.ssid, 0, sizeof(config.ssid));
-	memset(config.password, 0, sizeof(config.password));
-	strcpy((char*)config.ssid, ssid.c_str());
-	strcpy((char*)config.password, password.c_str());
-	config.ssid_len = ssid.length();
-	config.authmode = mode;
-	config.max_connection = 4; // max 4
-	config.beacon_interval = beaconInterval;
-	if (System.isReady())
+	if (channel != config.channel || hidden != config.ssid_hidden
+		|| mode != config.authmode|| beaconInterval != config.beacon_interval
+		|| strncmp(ssid.c_str(), (char*)config.ssid, sizeof(config.ssid))!=0 || strncmp(password.c_str(), (char*)config.password, sizeof(config.password))!=0)
 	{
-		noInterrupts();
-		if (!wifi_softap_set_config(&config))
+		config.channel = channel;
+		config.ssid_hidden = hidden;
+		memset(config.ssid, 0, sizeof(config.ssid));
+		memset(config.password, 0, sizeof(config.password));
+		strcpy((char*)config.ssid, ssid.c_str());
+		strcpy((char*)config.password, password.c_str());
+		config.ssid_len = ssid.length();
+		config.authmode = mode;
+		config.max_connection = 4; // max 4
+		config.beacon_interval = beaconInterval;
+		if (System.isReady())
 		{
+			noInterrupts();
+			if (!wifi_softap_set_config(&config))
+			{
+				interrupts();
+				wifi_softap_dhcps_start();
+				enable(enabled);
+				debugf("Can't set AP configuration!");
+				return false;
+			}
 			interrupts();
-			wifi_softap_dhcps_start();
-			enable(enabled);
-			debugf("Can't set AP configuration!");
-			return false;
+			debugf("AP configuration was updated");
 		}
-		interrupts();
-		debugf("AP configuration was updated");
+		else
+		{
+			debugf("Set AP configuration in background");
+			if (runConfig != NULL)
+				delete runConfig;
+			runConfig = new softap_config();
+			memcpy(runConfig, &config, sizeof(softap_config));
+		}
 	}
 	else
-	{
-		debugf("Set AP configuration in background");
-		if (runConfig != NULL)
-			delete runConfig;
-		runConfig = new softap_config();
-		memcpy(runConfig, &config, sizeof(softap_config));
-	}
+		debugf("AP configuration loaded");
 
 	wifi_softap_dhcps_start();
 	enable(enabled);
@@ -131,15 +142,11 @@ bool AccessPointClass::setIP(IPAddress address)
 
 String AccessPointClass::getMAC()
 {
-	String mac;
 	uint8 hwaddr[6] = {0};
 	wifi_get_macaddr(SOFTAP_IF, hwaddr);
-	for (int i = 0; i < 6; i++)
-	{
-		if (hwaddr[i] < 0x10) mac += "0";
-		mac += String(hwaddr[i], HEX);
-	}
-	return mac;
+	char buf[20];
+	sprintf(buf, "%02x%02x%02x%02x%02x%02x", hwaddr[0], hwaddr[1], hwaddr[2], hwaddr[3], hwaddr[4], hwaddr[5]);
+	return String(buf);
 }
 
 String AccessPointClass::getSSID()
@@ -147,7 +154,7 @@ String AccessPointClass::getSSID()
 	softap_config config = {0};
 	if (!wifi_softap_get_config(&config))
 	{
-		debugf("Can't read station configuration!");
+		debugf("Can't read AP configuration!");
 		return "";
 	}
 	debugf("SSID: %s", (char*)config.ssid);
@@ -159,7 +166,7 @@ String AccessPointClass::getPassword()
 	softap_config config = {0};
 	if (!wifi_softap_get_config(&config))
 	{
-		debugf("Can't read station configuration!");
+		debugf("Can't read AP configuration!");
 		return "";
 	}
 	debugf("Pass: %s", (char*)config.password);

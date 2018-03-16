@@ -20,8 +20,7 @@
 #include <stdlib.h>
 #include "eagle_soc.h"
 #include "espinc/spi_register.h"
-#include "espinc/c_types_compatible.h"
-
+#include "c_types.h"
 // define the static singleton
 SPIClass SPI;
 
@@ -113,12 +112,11 @@ void SPIClass::endTransaction() {
  */
 uint32 SPIClass::transfer32(uint32 data, uint8 bits)
 {
-	uint32_t regvalue = 0;
+	uint32_t regvalue = READ_PERI_REG(SPI_USER(SPI_NO)) & (SPI_WR_BYTE_ORDER | SPI_RD_BYTE_ORDER | SPI_CK_OUT_EDGE);
 
 	while(READ_PERI_REG(SPI_CMD(SPI_NO))&SPI_USR);
 
 	regvalue |=  SPI_USR_MOSI | SPI_DOUTDIN | SPI_CK_I_EDGE;
-	regvalue &= ~(BIT2 | SPI_USR_ADDR | SPI_USR_DUMMY | SPI_USR_MISO | SPI_USR_COMMAND); //clear bit 2 see example IoT_Demo
 	WRITE_PERI_REG(SPI_USER(SPI_NO), regvalue);
 
 
@@ -142,6 +140,31 @@ uint32 SPIClass::transfer32(uint32 data, uint8 bits)
 
 	if(READ_PERI_REG(SPI_USER(SPI_NO))&SPI_RD_BYTE_ORDER) {
 		return READ_PERI_REG(SPI_W0(SPI_NO)) >> (32-bits); //Assuming data in is written to MSB. TBC
+	} else {
+		return READ_PERI_REG(SPI_W0(SPI_NO)); //Read in the same way as DOUT is sent. Note existing contents of SPI_W0 remain unless overwritten!
+	}
+
+}
+
+
+/*
+ * 	 used for performance tuning when doing continuous reads
+ * 	 this method does not reset the registers , so make sure
+ * 	 that a regular transfer(data) call was performed
+ */
+uint8 SPIClass::read8()
+{
+
+	while(READ_PERI_REG(SPI_CMD(SPI_NO))&SPI_USR);
+
+	WRITE_PERI_REG(SPI_W0(SPI_NO), 0x00);
+
+	SET_PERI_REG_MASK(SPI_CMD(SPI_NO), SPI_USR);   // send
+
+	while (READ_PERI_REG(SPI_CMD(SPI_NO)) & SPI_USR);
+
+	if(READ_PERI_REG(SPI_USER(SPI_NO))&SPI_RD_BYTE_ORDER) {
+		return READ_PERI_REG(SPI_W0(SPI_NO)) >> (32-8); //Assuming data in is written to MSB. TBC
 	} else {
 		return READ_PERI_REG(SPI_W0(SPI_NO)); //Read in the same way as DOUT is sent. Note existing contents of SPI_W0 remain unless overwritten!
 	}
@@ -183,12 +206,11 @@ void SPIClass::transfer(uint8 *buffer, size_t numberBytes) {
 		// compute the number of bits to clock
 		num_bits = bufLenght * 8;
 
-		uint32_t regvalue = 0;
+		uint32_t regvalue = READ_PERI_REG(SPI_USER(SPI_NO)) & (SPI_WR_BYTE_ORDER | SPI_RD_BYTE_ORDER | SPI_CK_OUT_EDGE);
 
 		while(READ_PERI_REG(SPI_CMD(SPI_NO))&SPI_USR);
 
 		regvalue |=  SPI_USR_MOSI | SPI_DOUTDIN | SPI_CK_I_EDGE;
-		regvalue &= ~(BIT2 | SPI_USR_ADDR | SPI_USR_DUMMY | SPI_USR_MISO | SPI_USR_COMMAND); //clear bit 2 see example IoT_Demo
 		WRITE_PERI_REG(SPI_USER(SPI_NO), regvalue);
 
 
@@ -269,14 +291,14 @@ void SPIClass::prepare(SPISettings mySettings) {
  */
 void SPIClass::spi_mode(uint8 mode){
 
-	uint8 spi_cpha = mode & 0xF0;
-	uint8 spi_cpol = mode & 0x0F;
+	uint8 spi_cpha = mode & 0x0F;
+	uint8 spi_cpol = mode & 0xF0;
 
 #ifdef SPI_DEBUG
 	debugf("SPIClass::spi_mode(mode %x) spi_cpha %X,spi_cpol %X)", mode, spi_cpha, spi_cpol);
 #endif
 
-	if(spi_cpha) {
+	if(spi_cpha == spi_cpol) {
 		CLEAR_PERI_REG_MASK(SPI_USER(SPI_NO), SPI_CK_OUT_EDGE);
 	} else {
 		SET_PERI_REG_MASK(SPI_USER(SPI_NO), SPI_CK_OUT_EDGE);
@@ -335,6 +357,8 @@ void SPIClass::setClock(uint8 prediv, uint8 cntdiv) {
 	debugf("SPIClass::setClock(prediv %d, cntdiv %d) for target %d",
 			prediv, cntdiv, _SPISettings._speed);
 #endif
+	debugf("SPIClass::setClock(prediv %d, cntdiv %d) for target %d",
+			prediv, cntdiv, _SPISettings._speed);
 
 	if((prediv==0)|(cntdiv==0)){
 		// go full speed = SYSTEMCLOCK
@@ -470,9 +494,3 @@ void SPIClass::setFrequency(int freq) {
 	}
 
 }
-
-
-
-
-
-

@@ -14,7 +14,7 @@
 
 rBootHttpUpdate* otaUpdater = 0;
 
-void OtaUpdate_CallBack(bool result) {
+void OtaUpdate_CallBack(rBootHttpUpdate& client, bool result) {
 	
 	Serial.println("In callback...");
 	if(result == true) {
@@ -95,24 +95,33 @@ void ShowInfo() {
     Serial.printf("System Chip ID: %x\r\n", system_get_chip_id());
     Serial.printf("SPI Flash ID: %x\r\n", spi_flash_get_id());
     //Serial.printf("SPI Flash Size: %d\r\n", (1 << ((spi_flash_get_id() >> 16) & 0xff)));
+
+    rboot_config conf;
+    conf = rboot_get_config();
+
+    debugf("Count: %d", conf.count);
+    debugf("ROM 0: %d", conf.roms[0]);
+    debugf("ROM 1: %d", conf.roms[1]);
+    debugf("ROM 2: %d", conf.roms[2]);
+    debugf("GPIO ROM: %d", conf.gpio_rom);
 }
 
 void serialCallBack(Stream& stream, char arrivedChar, unsigned short availableCharsCount) {
-	
-
-	if (arrivedChar == '\n') {
-		char str[availableCharsCount];
-		for (int i = 0; i < availableCharsCount; i++) {
+	int pos = stream.indexOf('\n');
+	if(pos > -1) {
+		char str[pos + 1];
+		for (int i = 0; i < pos + 1; i++) {
 			str[i] = stream.read();
 			if (str[i] == '\r' || str[i] == '\n') {
 				str[i] = '\0';
 			}
 		}
-		
+
 		if (!strcmp(str, "connect")) {
 			// connect to wifi
 			WifiStation.config(WIFI_SSID, WIFI_PWD);
 			WifiStation.enable(true);
+			WifiStation.connect();
 		} else if (!strcmp(str, "ip")) {
 			Serial.printf("ip: %s mac: %s\r\n", WifiStation.getIP().toString().c_str(), WifiStation.getMAC().c_str());
 		} else if (!strcmp(str, "ota")) {
@@ -168,19 +177,19 @@ void init() {
 #ifndef DISABLE_SPIFFS
 	if (slot == 0) {
 #ifdef RBOOT_SPIFFS_0
-		debugf("trying to mount spiffs at %x, length %d", RBOOT_SPIFFS_0 + 0x40200000, SPIFF_SIZE);
-		spiffs_mount_manual(RBOOT_SPIFFS_0 + 0x40200000, SPIFF_SIZE);
+		debugf("trying to mount spiffs at 0x%08x, length %d", RBOOT_SPIFFS_0, SPIFF_SIZE);
+		spiffs_mount_manual(RBOOT_SPIFFS_0, SPIFF_SIZE);
 #else
-		debugf("trying to mount spiffs at %x, length %d", 0x40300000, SPIFF_SIZE);
-		spiffs_mount_manual(0x40300000, SPIFF_SIZE);
+		debugf("trying to mount spiffs at 0x%08x, length %d", 0x100000, SPIFF_SIZE);
+		spiffs_mount_manual(0x100000, SPIFF_SIZE);
 #endif
 	} else {
 #ifdef RBOOT_SPIFFS_1
-		debugf("trying to mount spiffs at %x, length %d", RBOOT_SPIFFS_1 + 0x40200000, SPIFF_SIZE);
-		spiffs_mount_manual(RBOOT_SPIFFS_1 + 0x40200000, SPIFF_SIZE);
+		debugf("trying to mount spiffs at 0x%08x, length %d", RBOOT_SPIFFS_1, SPIFF_SIZE);
+		spiffs_mount_manual(RBOOT_SPIFFS_1, SPIFF_SIZE);
 #else
-		debugf("trying to mount spiffs at %x, length %d", 0x40500000, SPIFF_SIZE);
-		spiffs_mount_manual(0x40500000, SPIFF_SIZE);
+		debugf("trying to mount spiffs at 0x%08x, length %d", 0x300000, SPIFF_SIZE);
+		spiffs_mount_manual(0x300000, SPIFF_SIZE);
 #endif
 	}
 #else
